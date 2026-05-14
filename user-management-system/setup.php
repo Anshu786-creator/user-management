@@ -25,6 +25,100 @@ try {
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
     ");
+    $pdo->exec("
+        CREATE TABLE IF NOT EXISTS inventory_items (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            asset_type ENUM('computer', 'printer') NOT NULL,
+            asset_tag VARCHAR(80) NOT NULL UNIQUE,
+            brand VARCHAR(120) DEFAULT '',
+            model VARCHAR(120) DEFAULT '',
+            serial_number VARCHAR(120) DEFAULT '',
+            location VARCHAR(120) DEFAULT '',
+            department VARCHAR(120) DEFAULT '',
+            assigned_to VARCHAR(120) DEFAULT '',
+            status ENUM('active', 'repair', 'retired') NOT NULL DEFAULT 'active',
+            processor VARCHAR(120) DEFAULT '',
+            ram VARCHAR(80) DEFAULT '',
+            storage VARCHAR(120) DEFAULT '',
+            operating_system VARCHAR(120) DEFAULT '',
+            ip_address VARCHAR(60) DEFAULT '',
+            mac_address VARCHAR(60) DEFAULT '',
+            printer_type VARCHAR(120) DEFAULT '',
+            connectivity VARCHAR(120) DEFAULT '',
+            toner_model VARCHAR(120) DEFAULT '',
+            notes TEXT,
+            created_by INT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            INDEX idx_asset_type (asset_type),
+            INDEX idx_status (status),
+            CONSTRAINT fk_inventory_created_by FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+    ");
+    $pdo->exec("
+        CREATE TABLE IF NOT EXISTS inventory_requests (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            asset_type ENUM('computer', 'printer') NOT NULL,
+            asset_tag VARCHAR(80) NOT NULL,
+            brand VARCHAR(120) DEFAULT '',
+            model VARCHAR(120) DEFAULT '',
+            serial_number VARCHAR(120) DEFAULT '',
+            location VARCHAR(120) DEFAULT '',
+            department VARCHAR(120) DEFAULT '',
+            assigned_to VARCHAR(120) DEFAULT '',
+            status ENUM('pending', 'approved', 'rejected') NOT NULL DEFAULT 'pending',
+            asset_status ENUM('active', 'repair', 'retired') NOT NULL DEFAULT 'active',
+            processor VARCHAR(120) DEFAULT '',
+            ram VARCHAR(80) DEFAULT '',
+            storage VARCHAR(120) DEFAULT '',
+            operating_system VARCHAR(120) DEFAULT '',
+            ip_address VARCHAR(60) DEFAULT '',
+            mac_address VARCHAR(60) DEFAULT '',
+            printer_type VARCHAR(120) DEFAULT '',
+            connectivity VARCHAR(120) DEFAULT '',
+            toner_model VARCHAR(120) DEFAULT '',
+            notes TEXT,
+            requested_by INT NULL,
+            reviewed_by INT NULL,
+            reviewed_at TIMESTAMP NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            INDEX idx_request_status (status),
+            INDEX idx_request_type (asset_type),
+            CONSTRAINT fk_inventory_requests_requested_by FOREIGN KEY (requested_by) REFERENCES users(id) ON DELETE SET NULL,
+            CONSTRAINT fk_inventory_requests_reviewed_by FOREIGN KEY (reviewed_by) REFERENCES users(id) ON DELETE SET NULL
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+    ");
+    try {
+        $pdo->exec("ALTER TABLE inventory_requests ADD COLUMN asset_status ENUM('active', 'repair', 'retired') NOT NULL DEFAULT 'active' AFTER status");
+    } catch (Throwable $ignored) {
+    }
+    $pdo->exec("
+        CREATE TABLE IF NOT EXISTS master_options (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            field_name VARCHAR(80) NOT NULL,
+            option_value VARCHAR(120) NOT NULL,
+            is_active TINYINT(1) NOT NULL DEFAULT 1,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            UNIQUE KEY unique_master_option (field_name, option_value)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+    ");
+
+    $defaultOptions = [
+        'asset_type' => ['computer', 'printer'],
+        'status' => ['active', 'repair', 'retired'],
+        'department' => ['IT', 'Accounts', 'HR', 'Admin'],
+        'location' => ['Server Room', 'IT Room', 'Front Office'],
+        'printer_type' => ['Laser', 'Inkjet', 'Dot Matrix', 'Thermal'],
+        'connectivity' => ['USB', 'LAN', 'Wi-Fi', 'Shared'],
+    ];
+    $optionStmt = $pdo->prepare('INSERT IGNORE INTO master_options (field_name, option_value) VALUES (?, ?)');
+    foreach ($defaultOptions as $fieldName => $values) {
+        foreach ($values as $value) {
+            $optionStmt->execute([$fieldName, $value]);
+        }
+    }
 
     $stmt = $pdo->prepare('SELECT id FROM users WHERE email = ?');
     $stmt->execute(['admin@example.com']);
@@ -41,7 +135,7 @@ try {
     }
 
     echo '<h2>Setup complete</h2>';
-    echo '<p>Database and users table are ready.</p>';
+    echo '<p>Database, users, inventory, request, and master configuration tables are ready.</p>';
     echo '<p>Admin login: <strong>admin@example.com</strong> / <strong>admin123</strong></p>';
     echo '<p><a href="index.html">Open website</a></p>';
 } catch (Throwable $error) {
