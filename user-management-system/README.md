@@ -1,6 +1,6 @@
 # User Management System
 
-Simple offline-friendly PHP + MySQL website for:
+Simple offline-friendly React + PHP + MySQL website for:
 
 - User registration
 - User login/logout
@@ -10,6 +10,7 @@ Simple offline-friendly PHP + MySQL website for:
 - Printer inventory details
 - User product add requests with admin approval
 - Admin request approve/delete workflow
+- Admin system allotment and transfer history
 - Master configuration for product dropdown fields
 - Local network use without internet
 
@@ -34,6 +35,7 @@ The setup page creates:
 - Table: `users`
 - Table: `inventory_items`
 - Table: `inventory_requests`
+- Table: `inventory_assignments`
 - Table: `master_options`
 
 The project uses the default XAMPP MySQL login:
@@ -42,6 +44,15 @@ The project uses the default XAMPP MySQL login:
 - Password: empty
 
 If your MySQL password is different, update `config.php`.
+
+## React Frontend Build
+
+The Apache page loads the local bundle `assets/react-app.js`, so it runs without internet.
+
+To rebuild the React frontend after changing `src/main.jsx`:
+
+1. Run `npm install` once while dependencies are available.
+2. Run `npm run build`.
 
 ## Local Network Notes
 

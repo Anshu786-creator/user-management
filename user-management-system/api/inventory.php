@@ -96,10 +96,18 @@ try {
         json_response(['ok' => true, 'requests' => $stmt->fetchAll()]);
     }
 
-    if ($action === 'my_requests') {
-        $stmt = db()->prepare('SELECT * FROM inventory_requests WHERE requested_by = ? ORDER BY created_at DESC');
-        $stmt->execute([$user['id']]);
-        json_response(['ok' => true, 'requests' => $stmt->fetchAll()]);
+    if ($action === 'assignment_history') {
+        require_admin();
+        $id = (int)($_GET['id'] ?? 0);
+        $stmt = db()->prepare("
+            SELECT a.*, admin.name AS assigned_by_name
+            FROM inventory_assignments a
+            LEFT JOIN users admin ON admin.id = a.assigned_by
+            WHERE a.inventory_item_id = ?
+            ORDER BY a.created_at DESC, a.id DESC
+        ");
+        $stmt->execute([$id]);
+        json_response(['ok' => true, 'history' => $stmt->fetchAll()]);
     }
 
     if ($action === 'save') {
@@ -164,6 +172,69 @@ try {
         json_response(['ok' => true, 'message' => 'Request approved and added to inventory.']);
     }
 
+    if ($action === 'assign') {
+        $admin = require_admin();
+        $id = (int)($input['id'] ?? 0);
+        $targetType = (string)($input['target_type'] ?? 'existing');
+        $toUserId = null;
+        $toName = '';
+
+        if ($targetType === 'existing') {
+            $toUserId = (int)($input['to_user_id'] ?? 0);
+            $userStmt = db()->prepare('SELECT id, name FROM users WHERE id = ?');
+            $userStmt->execute([$toUserId]);
+            $targetUser = $userStmt->fetch();
+            if (!$targetUser) {
+                json_response(['ok' => false, 'message' => 'Select an existing user for allotment.'], 422);
+            }
+            $toUserId = (int)$targetUser['id'];
+            $toName = trim((string)$targetUser['name']);
+        } else {
+            $toName = clean_value($input, 'person_name');
+        }
+
+        if ($id <= 0 || $toName === '') {
+            json_response(['ok' => false, 'message' => 'Select a system and the person receiving it.'], 422);
+        }
+
+        $itemStmt = db()->prepare('SELECT id, asset_tag, assigned_to, assigned_user_id FROM inventory_items WHERE id = ?');
+        $itemStmt->execute([$id]);
+        $item = $itemStmt->fetch();
+        if (!$item) {
+            json_response(['ok' => false, 'message' => 'Approved inventory item not found.'], 404);
+        }
+
+        $actionName = trim((string)$item['assigned_to']) === '' ? 'allot' : 'transfer';
+        $note = clean_value($input, 'note');
+
+        db()->beginTransaction();
+        $update = db()->prepare('UPDATE inventory_items SET assigned_to = ?, assigned_user_id = ? WHERE id = ?');
+        $update->execute([$toName, $toUserId, $id]);
+        $history = db()->prepare("
+            INSERT INTO inventory_assignments
+                (inventory_item_id, assignment_action, from_assigned_to, to_assigned_to, from_user_id, to_user_id, note, assigned_by)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        ");
+        $history->execute([
+            $id,
+            $actionName,
+            (string)$item['assigned_to'],
+            $toName,
+            $item['assigned_user_id'] ?: null,
+            $toUserId,
+            $note,
+            $admin['id'],
+        ]);
+        db()->commit();
+
+        json_response([
+            'ok' => true,
+            'message' => $actionName === 'allot'
+                ? 'System allotted successfully.'
+                : 'System transferred successfully.',
+        ]);
+    }
+
     if ($action === 'reject_request') {
         $admin = require_admin();
         $id = (int)($input['id'] ?? 0);
@@ -186,6 +257,9 @@ try {
 
     json_response(['ok' => false, 'message' => 'Unknown action.'], 404);
 } catch (PDOException $error) {
+    if (db()->inTransaction()) {
+        db()->rollBack();
+    }
     if ($error->getCode() === '23000') {
         json_response(['ok' => false, 'message' => 'Asset tag already exists in approved inventory.'], 409);
     }

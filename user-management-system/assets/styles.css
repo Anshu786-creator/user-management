@@ -259,6 +259,21 @@ td select {
     grid-template-columns: minmax(300px, 380px) 1fr;
 }
 
+.assignment-panel {
+    margin-top: 20px;
+}
+
+.assignment-grid {
+    display: grid;
+    grid-template-columns: minmax(280px, 360px) 1fr;
+    gap: 20px;
+    align-items: start;
+}
+
+.selected-user {
+    margin: 0;
+}
+
 .profile-panel {
     width: min(100%, 520px);
 }
@@ -355,5 +370,9 @@ small {
     .filters select,
     .filters input {
         width: 100%;
+    }
+
+    .assignment-grid {
+        grid-template-columns: 1fr;
     }
 }

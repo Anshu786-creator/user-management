@@ -1,0 +1,16 @@
+{
+  "name": "offline-it-inventory-react",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "build": "esbuild ./src/main.jsx --bundle --format=esm --jsx=automatic --minify --legal-comments=none --define:process.env.NODE_ENV=\\\"production\\\" --outfile=assets/react-app.js"
+  },
+  "dependencies": {
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.4"
+  }
+}

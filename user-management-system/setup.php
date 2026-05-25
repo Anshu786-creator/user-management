@@ -36,6 +36,7 @@ try {
             location VARCHAR(120) DEFAULT '',
             department VARCHAR(120) DEFAULT '',
             assigned_to VARCHAR(120) DEFAULT '',
+            assigned_user_id INT NULL,
             status ENUM('active', 'repair', 'retired') NOT NULL DEFAULT 'active',
             processor VARCHAR(120) DEFAULT '',
             ram VARCHAR(80) DEFAULT '',
@@ -52,9 +53,15 @@ try {
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
             INDEX idx_asset_type (asset_type),
             INDEX idx_status (status),
-            CONSTRAINT fk_inventory_created_by FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL
+            CONSTRAINT fk_inventory_created_by FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL,
+            CONSTRAINT fk_inventory_assigned_user FOREIGN KEY (assigned_user_id) REFERENCES users(id) ON DELETE SET NULL
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
     ");
+    try {
+        $pdo->exec("ALTER TABLE inventory_items ADD COLUMN assigned_user_id INT NULL AFTER assigned_to");
+        $pdo->exec("ALTER TABLE inventory_items ADD CONSTRAINT fk_inventory_assigned_user FOREIGN KEY (assigned_user_id) REFERENCES users(id) ON DELETE SET NULL");
+    } catch (Throwable $ignored) {
+    }
     $pdo->exec("
         CREATE TABLE IF NOT EXISTS inventory_requests (
             id INT AUTO_INCREMENT PRIMARY KEY,
@@ -93,6 +100,25 @@ try {
         $pdo->exec("ALTER TABLE inventory_requests ADD COLUMN asset_status ENUM('active', 'repair', 'retired') NOT NULL DEFAULT 'active' AFTER status");
     } catch (Throwable $ignored) {
     }
+    $pdo->exec("
+        CREATE TABLE IF NOT EXISTS inventory_assignments (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            inventory_item_id INT NOT NULL,
+            assignment_action ENUM('allot', 'transfer') NOT NULL,
+            from_assigned_to VARCHAR(120) DEFAULT '',
+            to_assigned_to VARCHAR(120) NOT NULL,
+            from_user_id INT NULL,
+            to_user_id INT NULL,
+            note VARCHAR(255) DEFAULT '',
+            assigned_by INT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            INDEX idx_assignment_item (inventory_item_id),
+            CONSTRAINT fk_assignment_item FOREIGN KEY (inventory_item_id) REFERENCES inventory_items(id) ON DELETE CASCADE,
+            CONSTRAINT fk_assignment_from_user FOREIGN KEY (from_user_id) REFERENCES users(id) ON DELETE SET NULL,
+            CONSTRAINT fk_assignment_to_user FOREIGN KEY (to_user_id) REFERENCES users(id) ON DELETE SET NULL,
+            CONSTRAINT fk_assignment_admin FOREIGN KEY (assigned_by) REFERENCES users(id) ON DELETE SET NULL
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+    ");
     $pdo->exec("
         CREATE TABLE IF NOT EXISTS master_options (
             id INT AUTO_INCREMENT PRIMARY KEY,
@@ -135,7 +161,7 @@ try {
     }
 
     echo '<h2>Setup complete</h2>';
-    echo '<p>Database, users, inventory, request, and master configuration tables are ready.</p>';
+    echo '<p>Database, users, inventory, assignment, request, and master configuration tables are ready.</p>';
     echo '<p>Admin login: <strong>admin@example.com</strong> / <strong>admin123</strong></p>';
     echo '<p><a href="index.html">Open website</a></p>';
 } catch (Throwable $error) {
